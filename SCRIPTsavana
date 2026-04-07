@@ -1,0 +1,227 @@
+-- =============================================
+--   VIDA DE SAVANA - SCRIPT COMPLETO
+--   Auto Farm Missoes + Auto Farm Geral + Kill Aura + ESP
+--   GUI Personalizada 100% Lua
+-- =============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- ==================== CRIAÇÃO DA GUI ====================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SavannaFullFarmGUI"
+ScreenGui.Parent = playerGui
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -200)
+MainFrame.Size = UDim2.new(0, 420, 0, 420)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 14)
+UICorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, 0, 0, 55)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "VIDA DE SAVANA - FULL AUTO FARM"
+Title.TextColor3 = Color3.fromRGB(0, 255, 120)
+Title.TextSize = 19
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Parent = MainFrame
+TitleBar.BackgroundColor3 = Color3.fromRGB(0, 200, 90)
+TitleBar.BorderSizePixel = 0
+TitleBar.Size = UDim2.new(1, 0, 0, 4)
+TitleBar.Position = UDim2.new(0, 0, 0, 55)
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Parent = MainFrame
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+CloseBtn.Size = UDim2.new(0, 32, 0, 32)
+CloseBtn.Position = UDim2.new(1, -38, 0, 12)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.new(1,1,1)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 20
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- ==================== VARIAVEIS ====================
+local autoMissionEnabled = false
+local autoFarmEnabled = false
+local killAuraEnabled = false
+local espEnabled = false
+
+local missionConnection = nil
+local farmConnection = nil
+local auraConnection = nil
+
+-- ==================== FUNCOES ====================
+local function getNearbyPlayers(range)
+    local targets = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr \~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local dist = (player.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+            if dist <= range and plr.Character.Humanoid.Health > 0 then
+                table.insert(targets, plr)
+            end
+        end
+    end
+    return targets
+end
+
+-- ==================== AUTO FARM MISSOES ====================
+local function startAutoMissoes()
+    if missionConnection then return end
+    missionConnection = RunService.Heartbeat:Connect(function()
+        if not autoMissionEnabled then return end
+        
+        local missionFolder = player:FindFirstChild("Missions") or player:FindFirstChild("PlayerData") or player:FindFirstChild("Quests")
+        
+        if missionFolder then
+            for _, mission in ipairs(missionFolder:GetChildren()) do
+                if mission:FindFirstChild("Completed") and mission.Completed.Value == false then
+                    local remoteComplete = ReplicatedStorage:FindFirstChild("CompleteMission") 
+                                       or ReplicatedStorage.Remotes:FindFirstChild("ClaimMission")
+                                       or ReplicatedStorage:FindFirstChild("FinishQuest")
+                    
+                    if remoteComplete then
+                        remoteComplete:FireServer(mission.Name)
+                        print("Missao completada: " .. mission.Name)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- ==================== AUTO FARM GERAL ====================
+local function startAutoFarmGeral()
+    if farmConnection then return end
+    farmConnection = RunService.Heartbeat:Connect(function()
+        if not autoFarmEnabled then return end
+        
+        local targets = getNearbyPlayers(60)
+        for _, target in ipairs(targets) do
+            local remoteAttack = ReplicatedStorage:FindFirstChild("Attack") or ReplicatedStorage.Remotes:FindFirstChild("Hit")
+            if remoteAttack then
+                remoteAttack:FireServer(target.Character.Humanoid)
+            end
+            print("Auto Farm Geral - Atacando: " .. target.Name)
+        end
+    end)
+end
+
+-- ==================== KILL AURA ====================
+local function startKillAura()
+    if auraConnection then return end
+    auraConnection = RunService.Heartbeat:Connect(function()
+        if not killAuraEnabled then return end
+        local targets = getNearbyPlayers(35)
+        for _, target in ipairs(targets) do
+            print("Kill Aura - " .. target.Name)
+        end
+    end)
+end
+
+-- ==================== ESP ====================
+local espObjects = {}
+local function toggleESP(state)
+    if state then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr \~= player and plr.Character and not espObjects[plr] then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Adornee = plr.Character:FindFirstChild("Head")
+                billboard.Size = UDim2.new(0, 220, 0, 60)
+                billboard.StudsOffset = Vector3.new(0, 4, 0)
+                billboard.AlwaysOnTop = true
+                billboard.Parent = playerGui
+                
+                local label = Instance.new("TextLabel")
+                label.Size = UDim2.new(1,0,1,0)
+                label.BackgroundTransparency = 1
+                label.Text = plr.Name .. "\n" .. math.floor(plr.Character.Humanoid.Health) .. " HP | " .. math.floor((player.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude) .. "m"
+                label.TextColor3 = Color3.fromRGB(0, 255, 120)
+                label.TextStrokeTransparency = 0
+                label.Font = Enum.Font.GothamBold
+                label.TextSize = 15
+                label.Parent = billboard
+                
+                espObjects[plr] = billboard
+            end
+        end
+    else
+        for _, obj in pairs(espObjects) do obj:Destroy() end
+        espObjects = {}
+    end
+end
+
+-- ==================== BOTOES DA GUI ====================
+local yOffset = 75
+
+local function createToggle(name, callback)
+    local btn = Instance.new("TextButton")
+    btn.Parent = MainFrame
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.Size = UDim2.new(0, 380, 0, 48)
+    btn.Position = UDim2.new(0, 20, 0, yOffset)
+    btn.Text = name .. "  [OFF]"
+    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 17
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+    
+    local enabled = false
+    btn.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        btn.Text = name .. (enabled and "  [ON]" or "  [OFF]")
+        btn.BackgroundColor3 = enabled and Color3.fromRGB(0, 200, 90) or Color3.fromRGB(40, 40, 40)
+        callback(enabled)
+    end)
+    
+    yOffset = yOffset + 58
+    return btn
+end
+
+-- TOGGLES
+createToggle("Auto Farm Missoes", function(state)
+    autoMissionEnabled = state
+    if state then startAutoMissoes() else
+        if missionConnection then missionConnection:Disconnect() missionConnection = nil end
+    end
+end)
+
+createToggle("Auto Farm Geral", function(state)
+    autoFarmEnabled = state
+    if state then startAutoFarmGeral() else
+        if farmConnection then farmConnection:Disconnect() farmConnection = nil end
+    end
+end)
+
+createToggle("Kill Aura", function(state)
+    killAuraEnabled = state
+    if state then startKillAura() else
+        if auraConnection then auraConnection:Disconnect() auraConnection = nil end
+    end
+end)
+
+createToggle("ESP Players", function(state)
+    espEnabled = state
+    toggleESP(state)
+end)
+
+print("SCRIPT COMPLETO DE VIDA DE SAVANA CARREGADO COM SUCESSO!")
